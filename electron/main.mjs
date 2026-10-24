@@ -67,7 +67,7 @@ app.whenReady().then(async()=>{
  await window.loadFile(path.join(__dirname,'index.html'));
  if(smoke){
   try{
-   const dir=path.join(app.getAppPath(),'smoke-output');await fs.mkdir(dir,{recursive:true});
+   const dir=path.join(process.cwd(),'smoke-output');await fs.mkdir(dir,{recursive:true});
    await new Promise(r=>setTimeout(r,500));await fs.writeFile(path.join(dir,'welcome.png'),(await window.webContents.capturePage()).toPNG());
    const result=await window.webContents.executeJavaScript(`window.pc.scan().then(b=>{window.__setBuildForSmoke(b);return {cpu:b.Cpu.length,gpu:b.Gpu.length,rendered:document.getElementById('hardware').textContent.includes(b.Cpu[0].Name)};})`);
    if(!result.rendered)throw new Error('Hardware was not rendered.');
@@ -84,4 +84,3 @@ app.whenReady().then(async()=>{
  }
 });
 app.on('before-quit',()=>active?.cancel());app.on('window-all-closed',()=>app.quit());
-
