@@ -1,0 +1,60 @@
+name: Build and release Windows app
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Test diagnosis and buying rules
+        run: dotnet run --project Tests/PCInsight.Tests.csproj -c Release
+      - name: Build standalone Windows x64
+        run: dotnet publish PCInsight.csproj -c Release -r win-x64 --self-contained true -o artifacts/PCInsight-win-x64 -p:PublishSingleFile=true
+      - name: Package and checksum
+        shell: pwsh
+        run: |
+          Compress-Archive -Path artifacts/PCInsight-win-x64/* -DestinationPath artifacts/PCInsight-win-x64.zip
+          $hash = (Get-FileHash artifacts/PCInsight-win-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  PCInsight-win-x64.zip" | Set-Content artifacts/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PCInsight-win-x64
+          path: |
+            artifacts/PCInsight-win-x64.zip
+            artifacts/SHA256SUMS.txt
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: PCInsight-win-x64
+          path: artifacts
+      - name: Publish downloadable build
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+        run: |
+          gh release view $env:RELEASE_TAG
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:RELEASE_TAG --title "PC Insight $env:RELEASE_TAG" --generate-notes
+            if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }
+          }
+          gh release upload $env:RELEASE_TAG artifacts/PCInsight-win-x64.zip artifacts/SHA256SUMS.txt --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }

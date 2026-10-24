@@ -1,0 +1,25 @@
+using PCInsight;
+using System.Text.Json;
+var tests=0;
+void Check(bool condition,string name) { if(!condition) throw new Exception(name); Console.WriteLine("PASS "+name); tests++; }
+Sample S(double? cpu=20,double? ram=30,double? gpu=10) => new(DateTimeOffset.UtcNow,cpu,cpu,ram,0,10,gpu,JsonSerializer.SerializeToElement(Array.Empty<object>()));
+var quiet=Diagnosis.Analyze(Enumerable.Range(0,10).Select(_=>S()).ToArray());
+Check(!quiet.Any(f=>f.Priority>0),"Idle never justifies an upgrade");
+var busy=Diagnosis.Analyze(Enumerable.Range(0,10).Select(_=>S(98)).ToArray());
+Check(busy.Any(f=>f.Category=="CPU" && f.Priority>0),"Sustained CPU pressure detected");
+Check(!Diagnosis.Analyze(new[]{S(99),S(99)}).Any(f=>f.Priority>0),"Short capture cannot recommend");
+Check(!Diagnosis.Analyze(Enumerable.Range(0,10).Select(_=>S(null,null,null)).ToArray()).Any(f=>f.Priority>0),"Missing counters are unknown");
+Check(!Diagnosis.Analyze(Enumerable.Range(0,10).Select(i=>S(i==0?100:20)).ToArray()).Any(f=>f.Priority>0),"A transient spike does not justify a purchase");
+var now=DateTimeOffset.UtcNow;
+var offer=new Offer("Example","CPU",100,"USD",now.AddHours(-1),"https://example.org/part",new[]{"Vendor Board"},"https://example.org/support","Verify BIOS and cooling","Workload-specific evidence required");
+int Rank(Offer o,string board="Vendor Board",decimal budget=500)=>Diagnosis.Rank(new[]{o},busy,board,budget,now).Count;
+Check(Rank(offer)==1,"Fresh supported offer accepted");
+Check(Rank(offer with { CheckedAt=now.AddDays(-3) })==0,"Stale prices excluded");
+Check(Rank(offer with { CheckedAt=now.AddDays(1) })==0,"Future prices excluded");
+Check(Rank(offer,"Other board")==0,"Wrong board excluded");
+Check(Rank(offer,budget:50)==0,"Over budget excluded");
+Check(Rank(offer with { Currency="EUR" })==0,"No implicit currency conversion");
+Check(Rank(offer with { CompatibilitySource="" })==0,"Missing support evidence excluded");
+Check(Rank(offer with { Price=0 })==0,"Invalid price excluded");
+Check(Diagnosis.Rank(new[]{offer},quiet,"Vendor Board",500,now).Count==0,"No measured problem means no sale");
+Console.WriteLine($"{tests} checks passed.");
