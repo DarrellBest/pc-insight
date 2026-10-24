@@ -8,5 +8,5 @@
     <Version>0.1.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
-  <ItemGroup><Content Include="Scripts\*.ps1" CopyToOutputDirectory="PreserveNewest" /><Compile Remove="Tests\**" /></ItemGroup>
+  <ItemGroup><Content Include="..\..\Scripts\*.ps1" Link="Scripts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" /><Compile Remove="Tests\**" /></ItemGroup>
 </Project>

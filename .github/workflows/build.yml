@@ -1,4 +1,4 @@
-name: Build and release Windows app
+name: Electron Windows builds
 on:
   push:
     branches: [main]
@@ -13,26 +13,29 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
-          dotnet-version: '8.0.x'
-      - name: Test diagnosis and buying rules
-        run: dotnet run --project Tests/PCInsight.Tests.csproj -c Release
-      - name: Build standalone Windows x64
-        run: dotnet publish PCInsight.csproj -c Release -r win-x64 --self-contained true -o artifacts/PCInsight-win-x64 -p:PublishSingleFile=true
-      - name: Package and checksum
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Test diagnosis, compatibility and price provenance
+        run: npm test
+      - name: Package minified portable Windows app
+        run: npm run package
+      - name: Create checksum
         shell: pwsh
         run: |
-          Compress-Archive -Path artifacts/PCInsight-win-x64/* -DestinationPath artifacts/PCInsight-win-x64.zip
-          $hash = (Get-FileHash artifacts/PCInsight-win-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  PCInsight-win-x64.zip" | Set-Content artifacts/SHA256SUMS.txt
-      - uses: actions/upload-artifact@v4
+          Get-ChildItem release/PCInsight-*-win-x64.exe | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)" | Add-Content release/SHA256SUMS.txt
+          }
+      - uses: actions/upload-artifact@v7.0.2
         with:
-          name: PCInsight-win-x64
+          name: PCInsight-Windows
           path: |
-            artifacts/PCInsight-win-x64.zip
-            artifacts/SHA256SUMS.txt
+            release/PCInsight-*-win-x64.exe
+            release/SHA256SUMS.txt
   release:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
     needs: build
@@ -40,11 +43,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8.0.2
         with:
-          name: PCInsight-win-x64
-          path: artifacts
-      - name: Publish downloadable build
+          name: PCInsight-Windows
+          path: release
+      - name: Attach Windows executable to release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -56,5 +59,6 @@ jobs:
             gh release create $env:RELEASE_TAG --title "PC Insight $env:RELEASE_TAG" --generate-notes
             if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }
           }
-          gh release upload $env:RELEASE_TAG artifacts/PCInsight-win-x64.zip artifacts/SHA256SUMS.txt --clobber
+          $assets = @(Get-ChildItem release/PCInsight-*-win-x64.exe | ForEach-Object FullName)
+          gh release upload $env:RELEASE_TAG @assets release/SHA256SUMS.txt --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }

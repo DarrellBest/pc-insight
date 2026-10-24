@@ -1,76 +1,83 @@
 # PC Insight
 
-A local Windows desktop app that helps you investigate a slow PC before buying parts. **Early preview (v0.1.0)** built with WPF and .NET 8. No administrator privileges, cloud diagnostics, or telemetry service.
+**Know your machine. Keep your upgrade money until the evidence adds up.**
+
+A Windows performance cockpit built with **Electron**, **Chart.js**, and a sandboxed HTML/CSS interface. Local hardware discovery, live workload charts, short benchmarks, session comparisons and conditional upgrade candidates with real retailer price observations.
+
+![PC Insight cockpit](docs/cockpit.png)
 
 ## Download
 
-Download `PCInsight-win-x64.zip` from [Releases](https://github.com/DarrellBest/pc-insight/releases), extract the entire archive, then open `PCInsight.exe`. Keep the `Scripts` folder beside the executable. Release builds include the .NET runtime. Windows 10/11 x64 is the target; other architectures are not tested. Builds are currently unsigned.
+Get `PCInsight-*-win-x64.exe` from [Releases](https://github.com/DarrellBest/pc-insight/releases). Run the portable executable on Windows 10/11 x64. No separate .NET or Node installation. Builds are unsigned; SHA-256 checksums are attached. The original WPF prototype is retained in `legacy/wpf/`; Electron is the current app.
 
-## Use
+## The cockpit
 
-1. Select **Check my PC** to read CPU, GPU, installed memory modules, disks, volumes, motherboard, driver version and active power plan.
-2. Select **Run short tests** for a three-second single-worker SHA-256 test, a two-second buffer-copy test and a bounded 64 MiB temporary-file write. The file is removed afterward. These are local comparison measurements, not standardized scores or GPU benchmarks.
-3. Select **Watch slow activity · 30s**, then switch to your slow app or game. Sampling runs for approximately 30 seconds; query time can extend it. CPU, busiest core, memory, paging, drive activity, GPU engine activity and top CPU processes are retained in memory.
-4. Read the findings. Sustained pressure requires at least five valid samples, 80% counter coverage, and at least half of valid samples above threshold. A single spike never justifies a purchase. Low free space is reported separately.
-5. Load a price catalog or refresh an HTTPS feed, set a USD budget, and rank conditional upgrade candidates.
-6. Optionally export a JSON report. Reports contain hardware and process names; review them before sharing. No report is saved automatically.
+- **Overview:** animated illustration, CPU/GPU/memory/storage cards, motherboard identity and a guided “Check my PC” flow.
+- **Performance:** live resource timelines, gauges, threshold occupancy chart, top CPU processes and evidence cards. Missing counters are gaps, not zeros.
+- **Quick benchmarks:** worker-thread SHA-256, cache-sensitive memory copy and a bounded 64 MiB temporary-file write. These are not standardized cross-PC scores, full RAM bandwidth measurements or GPU benchmarks.
+- **Upgrade lab:** budget slider, real products, seller identity, price provenance, freshness gates, conditional compatibility checks and explanations.
+- **My sessions:** review the last ten captures and compare the latest two. Sessions stay in memory and clear on exit or rescan. Lower utilization alone does not establish faster performance.
+- **JSON export:** hardware, samples, findings and benchmarks. Reports may contain process names; review before sharing.
 
-## What this preview can and cannot conclude
+## Diagnose before buying
 
-It identifies measured resource pressure and competing explanations, **not a definitive root cause**. Background processes may include your intended workload. Close unnecessary applications and repeat to test the hypothesis. Disk busy time does not measure latency; paging and background I/O can produce the same symptom. GPU telemetry uses the busiest physical engine and may reflect video decoding or compute rather than rendering. Synthetic results are sensitive to caching, power settings and other activity.
+Scan, select an activity and record for 30, 60 or 120 seconds while using the slow application. Then close unnecessary apps or change settings and repeat an equivalent workload. Sampling interval depends on CIM query time; captures may slightly exceed the target duration.
 
-Temperature and thermal throttling remain **unknown** in this release. No kernel sensor driver is installed. The app explicitly tells you to check vendor telemetry before treating pressure as a hardware limit. It does not automatically identify BIOS settings, CPU support lists, PSU capacity, connector availability or case clearance. Serial numbers and user names are not requested.
+Pressure requires at least five valid samples, 80% counter coverage and at least half of valid samples above threshold: CPU/RAM/disk 90%, busiest core/GPU engine 95%. Pressure is evidence, not proof of root cause. GPU counters can reflect video or compute rather than rendering. Background processes may include the intended workload. Disk busy time does not measure latency.
 
-## Price and compatibility feeds
+NVIDIA GPU temperature and software thermal-slowdown flags are sampled if `nvidia-smi` is available and supports the query. CPU and other-vendor thermal coverage remains unknown. No kernel driver is installed. Missing sensors never mean overheating has been ruled out.
 
-**No retailer feed or live product catalog is bundled.** This preview implements the ingestion, freshness and evidence gates; a maintained retailer/affiliate feed and independently curated compatibility data are needed for useful buying recommendations. It never substitutes made-up prices. You can load a JSON file or enter an HTTPS endpoint serving the same array (maximum 2 MB, 20-second timeout, no redirects). Only the feed request leaves the machine; hardware details are not sent.
+## Real prices, with honest limits
 
-Offer schema (illustrative data only, deliberately dated so this example is excluded):
+The starter catalog has **three real US listings**, with exact models, seller identity and dated source observations:
 
-```json
-[
-  {
-    "name": "Exact manufacturer and part number",
-    "category": "RAM",
-    "price": 99.99,
-    "currency": "USD",
-    "checkedAt": "2020-01-01T00:00:00Z",
-    "url": "https://retailer.example/product",
-    "supportedBoards": ["Exact manufacturer and product shown in YOUR BUILD"],
-    "compatibilitySource": "https://manufacturer.example/support/memory-list",
-    "requirements": "Confirm DDR generation, form factor, capacity, BIOS and available slots.",
-    "benefitEvidence": "Describe workload evidence and its source. Do not invent a percentage gain."
-  }
-]
-```
+| Part | Observed USD price | Seller | Source date |
+| --- | ---: | --- | --- |
+| Corsair Vengeance LPX 32 GB DDR4-3200, CMK32GX4M2E3200C16 | $259.99 | Newegg | October 24, 2026 |
+| Samsung 990 PRO 2 TB, MZ-V9P2T0B/AM | $409.99 | Newegg seller option | October 24, 2026 |
+| Gigabyte Windforce RTX 5070, GV-N5070WF3OC-12GD | $1,099.99 | Halfmoon Tech Store via Newegg Marketplace | October 23, 2026 |
 
-Categories are `CPU`, `GPU`, `RAM`, and `Storage`. An offer must have a positive USD price within budget, a timestamp no more than 48 hours old and not in the future, HTTPS product and support links, exact detected motherboard match, requirements and benefit evidence. It must also target pressure observed in the current capture. The rank is observed pressure fraction divided by price; it is an explainable prioritization heuristic, **not predicted benefit or performance per dollar**. The entire budget is applied separately to each candidate; this is not a multi-part build optimizer. Shipping and tax are excluded.
+Sources: [Corsair](https://www.newegg.com/p/N82E16820236541), [Samsung](https://www.newegg.com/p/N82E16820147861), [Gigabyte](https://www.newegg.com/p/N82E16814932777). These are **dated observations, not guaranteed live prices or stock**. Default sellers can change. Check seller selection, shipping, tax, warranty and checkout price. This small catalog is not an exhaustive best-price comparison service.
 
-Compatibility and benefit statements are supplied by the feed and displayed as unverified claims. The board match is a conservative filter, not proof of physical or electrical compatibility. Independently check the linked support list, BIOS, power, cooling, dimensions and slots before purchase. No affiliate links or sponsored ranking are bundled. Automatic, validated compatible-part recommendations and quantitative uplift estimates are future work.
+**Refresh prices** requests a public structured product offer, requiring exact item/model identity, USD price, seller and in-stock status. Ambiguous aggregate offers are rejected. Newegg returned HTTP 403 in development, so a fresh direct fetch could not be verified here. On a block, timeout, redirect or unsupported format, the old price and date remain visible. The app never bypasses access controls or relabels stale prices as live. Prices older than 48 hours cannot qualify as recommendations.
 
-## Build and test
+For an official live source, enter your own [Best Buy API key](https://developer.bestbuy.com/) in **Price sources**. The [Products API](https://bestbuyapis.github.io/api-documentation/) adapter matches exact model numbers, checks new condition and online availability, and retrieves sale price and product URL. The key is encrypted with Windows-backed Electron `safeStorage` and excluded from reports. The adapter has offline regression coverage but has **not** been tested with a real API key. No credentials are bundled. No hardware data is sent to retailers.
 
-Install the .NET 8 SDK on Windows:
+## Recommendation safeguards
+
+- RAM must match DDR generation and DIMM form factor, increase total capacity as a replacement kit, and respect known firmware capacity limits. Confirm motherboard QVL, module count and BIOS yourself.
+- The SSD candidate needs a detected HDD. Confirm that the slow workload is on that HDD and an M.2 NVMe slot is available. An existing SSD is not assumed inferior.
+- The RTX 5070 candidate is restricted to a small recognized set of older GPUs. Unknown/higher-end GPUs, including RTX 4090, are not assumed to benefit. Confirm PSU, connectors, dimensions and workload-specific benchmarks.
+- Desktop parts are excluded when Windows identifies a laptop. CPU offers are withheld pending maintained exact motherboard/BIOS and workload comparison data.
+- Ranking is measured pressure fraction divided by price: a transparent prioritization heuristic, **not a predicted FPS gain or measured performance-per-dollar score**. No numerical uplift is fabricated. Budget applies to each part individually, not a combined basket.
+
+“No purchase justified yet” is an expected outcome, particularly for high-end builds. Catalog parts can still be inspected without being labeled recommendations.
+
+## Build and package
+
+Install Node.js 22+ on Windows:
 
 ```powershell
-dotnet build PCInsight.csproj -c Release
-dotnet run --project Tests/PCInsight.Tests.csproj -c Release
-dotnet publish PCInsight.csproj -c Release -r win-x64 --self-contained true -o artifacts/PCInsight-win-x64 -p:PublishSingleFile=true
+npm ci
+npm test
+npm start
+npm run package
 ```
 
-The dependency-free regression executable tests missing counters, short captures, transient spikes, price freshness, currency, budget, board support and the no-evidence/no-purchase rule. CIM queries may return partial results on managed machines. Windows PowerShell must be available; enterprise application control can block scripts. Script execution policy is set only for each child process and is never changed globally.
+`npm run build` bundles and **minifies JavaScript, CSS, main process, preload and benchmark worker** with esbuild. No production source maps. Electron Builder packages ASAR with maximum compression and writes a portable x64 executable to `release/`. Chromium/runtime size still dominates the download; minification cannot make Electron tiny.
 
-## Releases
+`npm run smoke` runs a hidden real Windows scan, 30-second activity capture and benchmark worker, checks the rendered inventory, and saves ignored screenshots in `smoke-output/`. Unit tests use synthetic fixtures for pressure gates, missing counters, memory compatibility, downgrade protection, price freshness, seller identity and URL restrictions.
 
-GitHub Actions builds and tests every main push and pull request. Push a `v*` tag (for example `git tag v0.1.0; git push origin v0.1.0`) or publish a GitHub release to attach the standalone x64 ZIP and SHA-256 checksum. CI artifacts are also available on successful builds. Release uploads use a separate job with `contents: write`; build jobs have read-only repository access.
+GitHub Actions installs locked dependencies, tests, packages and uploads artifacts. Push a `v*` tag or publish a GitHub release to attach the executable and checksum automatically. Only the release job has repository write permission.
 
-## Architecture
+## Privacy and security
 
-- `MainWindow.xaml`: native desktop UI and workflow.
-- `Scripts/Scan.ps1`: read-only CIM inventory, no identifying serial numbers.
-- `Scripts/Sample.ps1`: optional Windows performance counters; missing values stay null.
-- `Services.cs`: cancellable child processes, bounded local microbenchmarks.
-- `Models.cs`: deterministic diagnosis and conservative offer filters.
-- `Tests/`: offline regression checks, no hardware or network required.
+Node integration is disabled in the renderer; context isolation and sandboxing are enabled. A narrow preload exposes specific operations. IPC validates the calling frame. Navigation, popups and permissions are blocked. Content Security Policy disallows renderer network access. Main-process outbound links are restricted to known HTTPS retailer hosts. PowerShell script paths and capture durations are fixed/validated. No remote HTML is rendered.
 
-References: [Microsoft performance counters](https://learn.microsoft.com/windows/win32/perfctrs), [WMI performance data](https://github.com/MicrosoftDocs/win32/blob/docs/desktop-src/WmiSdk/monitoring-performance-data.md), [GitHub Actions permissions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax).
+No diagnostic data leaves the PC. Retailer requests contain product identifiers and, for Best Buy, the configured key. The optional encrypted key persists in the per-user app directory; diagnostics persist only when explicitly exported. PowerShell/CIM must be available; managed-device policy may block scripts. Execution policy is changed only for each child process, never globally.
+
+## Layout
+
+`ui/`: interface and charts · `electron/`: privileged operations, price adapters and diagnosis · `Scripts/`: Windows collectors · `test/`: regression checks · `tools/build.mjs`: minification · `.github/workflows/build.yml`: releases.
+
+MIT licensed. Electron/runtime and bundled library licenses are included by the packager. References: [Electron security](https://www.electronjs.org/docs/latest/tutorial/security), [Windows performance counters](https://learn.microsoft.com/windows/win32/perfctrs).

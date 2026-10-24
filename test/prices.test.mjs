@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {parseNewegg,allowedUrl,refreshPrices} from '../electron/prices.mjs';
+const part={id:'N82EXAMPLE',model:'EXACT-MODEL',observedAt:'2020-01-01T00:00:00Z',price:50};
+const product={ '@type':'Product',mpn:'EXACT-MODEL',offers:{'@type':'Offer',price:'123.45',priceCurrency:'USD',seller:{name:'Example retailer'},availability:'https://schema.org/InStock'}};
+const html=p=>`<script type="application/ld+json">${JSON.stringify(p)}</script>`;
+test('Structured exact-model offer preserves seller identity',()=>{const p=parseNewegg(html(product),part,'2026-10-24T00:00:00Z');assert.equal(p.price,123.45);assert.equal(p.seller,'Example retailer');});
+test('Do not pick related products or ambiguous low prices',()=>{assert.throws(()=>parseNewegg(html({...product,mpn:'OTHER'}),part));assert.throws(()=>parseNewegg(html({...product,offers:{'@type':'AggregateOffer',lowPrice:1}}),part));});
+test('Currency, availability and seller are mandatory',()=>{for(const change of [{priceCurrency:'CAD'},{seller:null},{availability:'https://schema.org/OutOfStock'},{price:0}])assert.throws(()=>parseNewegg(html({...product,offers:{...product.offers,...change}}),part));});
+test('Only exact HTTPS retailer hosts accepted',()=>{assert(allowedUrl('https://www.newegg.com/p/ABC'));for(const u of ['file:///etc/passwd','javascript:alert(1)','https://www.newegg.com.evil.test/','https://user@www.newegg.com/','https://www.newegg.com:1234/'])assert(!allowedUrl(u));});
+test('Failed refresh retains price and observation timestamp',async()=>{const old=globalThis.fetch;globalThis.fetch=async()=>({ok:false,status:403});try{const [p]=await refreshPrices([part]);assert.equal(p.observedAt,part.observedAt);assert.equal(p.price,part.price);assert(p.refreshError);}finally{globalThis.fetch=old;}});
+test('Retailer link switches with the live source',()=>{const p=parseNewegg(html(product),{...part,url:'https://www.bestbuy.com/product/old'});assert.equal(new URL(p.url).hostname,'www.newegg.com');});
+test('Similar model suffixes are not the same product',()=>assert.throws(()=>parseNewegg(html({...product,mpn:'EXACT-MODEL-X'}),part)));
+test('Best Buy accepts only exact new available models',async()=>{const old=globalThis.fetch;globalThis.fetch=async url=>{assert(String(url).startsWith('https://api.bestbuy.com/'));const bytes=Buffer.from(JSON.stringify({products:[{modelNumber:'EXACT-MODEL',salePrice:95,onlineAvailability:true,condition:'New',url:'https://www.bestbuy.com/product/example'}]}));return {ok:true,body:(async function*(){yield bytes;})()};};try{const [p]=await refreshPrices([part],'test-key');assert.equal(p.price,95);assert.equal(p.seller,'Best Buy');assert(!p.refreshError);}finally{globalThis.fetch=old;}});

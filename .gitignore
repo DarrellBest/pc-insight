@@ -4,3 +4,8 @@ obj/
 artifacts/
 *.user
 pc-insight-report*.json
+node_modules/
+dist/
+release/
+smoke-output/
+*.log

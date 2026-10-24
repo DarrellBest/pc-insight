@@ -1,0 +1,32 @@
+{
+  "name": "pc-insight",
+  "productName": "PC Insight",
+  "version": "0.2.0",
+  "description": "Your local PC performance cockpit",
+  "author": "DarrellBest",
+  "license": "MIT",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "start": "npm run build && electron .",
+    "test": "node --test test/*.test.mjs",
+    "smoke": "npm run build && electron . --smoke-test",
+    "package": "npm run build && electron-builder --win portable --x64 --publish never"
+  },
+  "devDependencies": {
+    "chart.js": "4.6.1",
+    "electron": "45.0.0",
+    "electron-builder": "26.18.0",
+    "esbuild": "0.28.2"
+  },
+  "build": {
+    "appId": "com.darrellbest.pcinsight",
+    "asar": true,
+    "compression": "maximum",
+    "files": ["dist/**/*", "package.json"],
+    "extraResources": [{"from": "Scripts", "to": "Scripts", "filter": ["*.ps1"]}],
+    "directories": {"output": "release"},
+    "win": {"target": "portable", "artifactName": "PCInsight-${version}-win-x64.${ext}", "icon": "build-resources/icon.ico", "signExecutable": false},
+    "portable": {"requestExecutionLevel": "user"}
+  }
+}
